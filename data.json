@@ -1,16 +1,16 @@
 {
   "months": [
-    "May",
-    "April",
-    "March",
-    "February",
-    "January",
-    "December",
-    "November",
-    "October"
+    "May 2026",
+    "April 2026",
+    "March 2026",
+    "February 2026",
+    "January 2026",
+    "December 2025",
+    "November 2025",
+    "October 2025"
   ],
   "history": {
-    "May": [
+    "May 2026": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
@@ -894,7 +894,7 @@
         "atm_value": 1164.6
       }
     ],
-    "April": [
+    "April 2026": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
@@ -1778,7 +1778,7 @@
         "atm_value": 1016.1
       }
     ],
-    "March": [
+    "March 2026": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
@@ -2676,7 +2676,7 @@
         "atm_value": 945.7
       }
     ],
-    "February": [
+    "February 2026": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
@@ -3574,7 +3574,7 @@
         "atm_value": 776.9
       }
     ],
-    "January": [
+    "January 2026": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
@@ -4472,7 +4472,7 @@
         "atm_value": 885.2
       }
     ],
-    "December": [
+    "December 2025": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
@@ -5370,7 +5370,7 @@
         "atm_value": 628.8
       }
     ],
-    "November": [
+    "November 2025": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
@@ -6268,7 +6268,7 @@
         "atm_value": 566.9
       }
     ],
-    "October": [
+    "October 2025": [
       {
         "category": "Public Sector Banks",
         "sr_no": 1,
