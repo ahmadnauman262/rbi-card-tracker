@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RBI Credit Card Analytics Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (XLSX) CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white shadow-md border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between py-4 md:h-16 md:py-0 gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md">
+                        <i class="fa-solid fa-credit-card text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold tracking-tight">CARD<span class="text-indigo-400">PULSE</span></h1>
+                        <p class="text-[10px] text-slate-400 font-medium tracking-widest uppercase">RBI Payment Analytics Platform</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation Tabs with new Historical 2-Bank option -->
+                <nav class="flex flex-wrap gap-1 bg-slate-800/80 p-1 rounded-xl">
+                    <button id="tab-home-btn" onclick="switchTab('home')" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Home Dashboard</span>
+                    </button>
+                    <button id="tab-compare-btn" onclick="switchTab('compare')" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-700/50">
+                        <i class="fa-solid fa-scale-balanced"></i>
+                        <span>Benchmark Compare</span>
+                    </button>
+                    <button id="tab-history-compare-btn" onclick="switchTab('history-compare')" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-700/50">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>Historical 2-Bank Comparison</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Outer Wrapper -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
+        
+        <!-- Left Side Upload Panel / Floating Controller -->
+        <aside class="w-full lg:w-80 flex-shrink-0 flex flex-col gap-6">
+            
+            <!-- Reporting Period Month Selector -->
+            <div id="reporting-period-card" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3">
+                <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-days text-indigo-500"></i>
+                    <span>Reporting Period</span>
+                </h3>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Select a baseline period gathered from the automated monthly scraper pipeline.
+                </p>
+                <select id="month-selector" onchange="handleMonthSelection(this.value)" class="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500 transition-all cursor-pointer">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+
+            <!-- File Upload & Parser Card -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-indigo-500"></i>
+                        <span>Data Engine</span>
+                    </h3>
+                    <span id="data-status-badge" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1.5">
+                        <span class="h-1.5 w-1.5 bg-indigo-500 rounded-full"></span>
+                        Pipeline Connected
+                    </span>
+                </div>
+                
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Review a custom or historical monthly worksheet by dragging and dropping it below.
+                </p>
+
+                <!-- Drag & Drop Upload Zone -->
+                <div id="drop-zone" class="border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-slate-50/50 rounded-xl p-4 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center text-center group">
+                    <input type="file" id="file-uploader" class="hidden" accept=".csv, .xlsx, .xls">
+                    <i class="fa-solid fa-file-excel text-3xl text-slate-400 group-hover:text-indigo-500 group-hover:scale-110 transition-all duration-300 mb-2"></i>
+                    <p class="text-xs font-semibold text-slate-700">Drop files here, or browse</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Accepts RBI CSV or XLSX sheets</p>
+                </div>
+
+                <!-- Custom Alert Bar -->
+                <div id="alert-box" class="hidden bg-amber-50 text-amber-800 border border-amber-200 p-3 rounded-lg text-xs flex gap-2">
+                    <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
+                    <span id="alert-text">Warning placeholder</span>
+                </div>
+            </div>
+
+            <!-- Dashboard Context Card -->
+            <div class="bg-slate-900 text-slate-200 p-6 rounded-2xl shadow-sm flex flex-col gap-4 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl"></div>
+                <h4 class="font-bold text-white flex items-center gap-2 text-sm">
+                    <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                    <span>Pipeline Active</span>
+                </h4>
+                <p class="text-xs leading-relaxed text-slate-400">
+                    The background scraper regularly queries the Reserve Bank of India server, compiling the 8 most recent months as a structural base history.
+                </p>
+                <div class="border-t border-slate-800 pt-3 flex flex-col gap-2">
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>Database Size:</span>
+                        <span class="font-semibold text-white" id="rows-count-badge">-- Banks</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>Metrics Compiled:</span>
+                        <span class="font-semibold text-white">5 Core Categories</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Content Space -->
+        <section class="flex-grow flex flex-col gap-6 overflow-hidden">
+
+            <!-- ================= HOME DASHBOARD VIEW ================= -->
+            <div id="home-view" class="flex flex-col gap-8 transition-opacity duration-300">
+                
+                <!-- Quick KPI Summary Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- KPI 1 -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Active Cards</span>
+                            <h2 class="text-2xl font-bold text-slate-800 mt-1" id="kpi-total-cards">--</h2>
+                            <span class="text-[10px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                                <i class="fa-solid fa-chart-line"></i> Active Portfolio
+                            </span>
+                        </div>
+                        <div class="h-12 w-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                            <i class="fa-solid fa-credit-card text-xl"></i>
+                        </div>
+                    </div>
+                    <!-- KPI 2 -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Monthly Spend Value</span>
+                            <h2 class="text-2xl font-bold text-slate-800 mt-1" id="kpi-total-spend">--</h2>
+                            <span class="text-[10px] text-slate-400 font-medium mt-1 flex items-center gap-1">
+                                Monthly cumulative (E-com + PoS)
+                            </span>
+                        </div>
+                        <div class="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                            <i class="fa-solid fa-indian-rupee-sign text-xl"></i>
+                        </div>
+                    </div>
+                    <!-- KPI 3 -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Ticket Size</span>
+                            <h2 class="text-2xl font-bold text-slate-800 mt-1" id="kpi-avg-ticket">--</h2>
+                            <span class="text-[10px] text-slate-400 font-medium mt-1 flex items-center gap-1">
+                                Across online & POS terminals
+                            </span>
+                        </div>
+                        <div class="h-12 w-12 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">
+                            <i class="fa-solid fa-basket-shopping text-xl"></i>
+                        </div>
+                    </div>
+                    <!-- KPI 4 -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Market Leader</span>
+                            <h2 class="text-lg font-bold text-indigo-700 mt-2 truncate max-w-[140px]" id="kpi-market-leader">--</h2>
+                            <span class="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                                Maximum circulation share
+                            </span>
+                        </div>
+                        <div class="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                            <i class="fa-solid fa-crown text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualizations Grid Block 1 -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Market share bar / pie combo -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-7 flex flex-col justify-between">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-ranking-star text-indigo-500"></i>
+                                <span>Outstanding Cards Market Share (Top 10 Banks)</span>
+                            </h4>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="marketShareChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Channel breakdown donut -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-5 flex flex-col justify-between">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-shuffle text-indigo-500"></i>
+                                <span>Spend Channel Allocation Breakdown</span>
+                            </h4>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="channelBreakdownChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 8-Month Historical Portfolio Trends Panel -->
+                <div id="trends-container" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between hidden">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-indigo-500"></i>
+                            <span>8-Month Historical Portfolio Trends</span>
+                        </h4>
+                        <span class="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full">Aggregated Trendline Metrics</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Total Cards Circulation Growth</p>
+                            <div class="relative h-48">
+                                <canvas id="trendCardsChart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Total Monthly Spend (₹ Crores)</p>
+                            <div class="relative h-48">
+                                <canvas id="trendSpendsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualizations Grid Block 2 -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Market Sector Card Distribution -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-5 flex flex-col justify-between">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-circle-nodes text-indigo-500"></i>
+                                <span>Sector Wise Issuance Breakdown</span>
+                            </h4>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="sectorWiseChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top Spends comparative bar chart -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-7 flex flex-col justify-between">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-arrow-up-right-dots text-indigo-500"></i>
+                                <span>Top 10 Banks: Total Monthly Transaction Spend (₹ Cr)</span>
+                            </h4>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="topSpendsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search & Ledger Section -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h3 class="font-bold text-slate-800">Dynamic Cards & Operations Ledger</h3>
+                            <p class="text-xs text-slate-500 mt-1">Granular card operational summaries, sorted by volume parameters.</p>
+                        </div>
+                        
+                        <!-- Search and Sector filter toolbar -->
+                        <div class="flex flex-col sm:flex-row items-stretch gap-2.5">
+                            <div class="relative flex-grow">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input type="text" id="table-search" oninput="filterLedgerTable()" placeholder="Search bank name..." class="w-full sm:w-64 pl-9 pr-4 py-1.5 border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 rounded-lg text-xs outline-none transition-all duration-200">
+                            </div>
+                            <select id="sector-filter" onchange="filterLedgerTable()" class="border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 rounded-lg text-xs outline-none px-3 py-1.5 transition-all duration-200 bg-white">
+                                <option value="">All Sectors</option>
+                                <option value="Public Sector Banks">Public Sector</option>
+                                <option value="Private Sector Banks">Private Sector</option>
+                                <option value="Foreign Banks">Foreign Banks</option>
+                                <option value="Small Finance Banks">Small Finance Banks</option>
+                                <option value="Payment Banks">Payment Banks</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Ledger Table Interface -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                                    <th class="py-3.5 px-6">Bank Name</th>
+                                    <th class="py-3.5 px-6">Sector Classification</th>
+                                    <th class="py-3.5 px-6 text-right cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTableByField('cards_outstanding')">
+                                        Outstanding Cards <i class="fa-solid fa-sort ml-1"></i>
+                                    </th>
+                                    <th class="py-3.5 px-6 text-right cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTableByField('total_spend')">
+                                        Total Spend (₹ Cr) <i class="fa-solid fa-sort ml-1"></i>
+                                    </th>
+                                    <th class="py-3.5 px-6 text-right cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTableByField('pos_value')">
+                                        PoS Value (₹ Cr) <i class="fa-solid fa-sort ml-1"></i>
+                                    </th>
+                                    <th class="py-3.5 px-6 text-right cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTableByField('online_value')">
+                                        Online (₹ Cr) <i class="fa-solid fa-sort ml-1"></i>
+                                    </th>
+                                    <th class="py-3.5 px-6 text-right cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTableByField('avg_spend_per_card')">
+                                        Avg Spend / Card <i class="fa-solid fa-sort ml-1"></i>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="ledger-table-body" class="divide-y divide-slate-150 text-xs text-slate-700">
+                                <!-- Dynamically Rendered Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination and summary metadata footer -->
+                    <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span id="table-showing-text">Showing 1 to 10 of -- entries</span>
+                        <div class="flex items-center space-x-1">
+                            <button onclick="changePage(-1)" class="p-1 px-3 border border-slate-200 rounded hover:bg-slate-50 text-slate-600 disabled:opacity-40 transition" id="prev-page-btn">Prev</button>
+                            <span id="page-indicator" class="font-semibold text-slate-800 px-3">1 / 1</span>
+                            <button onclick="changePage(1)" class="p-1 px-3 border border-slate-200 rounded hover:bg-slate-50 text-slate-600 disabled:opacity-40 transition" id="next-page-btn">Next</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ================= BENCHMARK COMPARE VIEW ================= -->
+            <div id="compare-view" class="hidden flex flex-col gap-8 transition-opacity duration-300">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-800 text-lg">Compare Performance Indices Side-by-Side</h3>
+                    <p class="text-xs text-slate-500 mt-1">Select up to 4 banks from the dropdown selectors below to load comparative charts and gauges instantly.</p>
+                    
+                    <!-- Dynamic Selectors Row -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                        <!-- Selector 1 -->
+                        <div class="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="h-2 w-2 rounded-full bg-indigo-500"></span> Bank 1 (Primary Benchmark)
+                            </label>
+                            <select id="compare-select-0" onchange="runCompareBenchmark()" class="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg p-2 outline-none focus:border-indigo-500 transition-all">
+                                <!-- Options populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Selector 2 -->
+                        <div class="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Bank 2
+                            </label>
+                            <select id="compare-select-1" onchange="runCompareBenchmark()" class="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg p-2 outline-none focus:border-emerald-500 transition-all">
+                                <!-- Options populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Selector 3 -->
+                        <div class="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="h-2 w-2 rounded-full bg-amber-500"></span> Bank 3
+                            </label>
+                            <select id="compare-select-2" onchange="runCompareBenchmark()" class="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg p-2 outline-none focus:border-amber-500 transition-all">
+                                <!-- Options populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Selector 4 -->
+                        <div class="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="h-2 w-2 rounded-full bg-fuchsia-500"></span> Bank 4
+                            </label>
+                            <select id="compare-select-3" onchange="runCompareBenchmark()" class="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg p-2 outline-none focus:border-fuchsia-500 transition-all">
+                                <!-- Options populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compare Side-by-Side Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6" id="comparison-cards-row">
+                    <!-- Cards will be populated dynamically -->
+                </div>
+
+                <!-- Structured Parameter comparison table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100">
+                        <h4 class="font-bold text-slate-800">Operational Metric Scorecard</h4>
+                        <p class="text-xs text-slate-500 mt-1">Cross comparison of core financial indices of the four designated banks.</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                                    <th class="py-3 px-6">Core Performance Parameters</th>
+                                    <th class="py-3 px-6 text-center" id="comp-tbl-header-0">--</th>
+                                    <th class="py-3 px-6 text-center" id="comp-tbl-header-1">--</th>
+                                    <th class="py-3 px-6 text-center" id="comp-tbl-header-2">--</th>
+                                    <th class="py-3 px-6 text-center" id="comp-tbl-header-3">--</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparison-table-body" class="divide-y divide-slate-150 text-xs text-slate-700">
+                                <!-- Populated dynamically by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Structured comparative chart grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Cards compare graph -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-credit-card text-indigo-500"></i> Cards in Force Comparison
+                        </h4>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="compareCardsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Spends compare graph -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-arrow-up-right-dots text-emerald-500"></i> Monthly Spends Comparison (₹ Cr)
+                        </h4>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="compareSpendsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ================= NEW: HISTORICAL BANK COMPARISON VIEW ================= -->
+            <div id="history-compare-view" class="hidden flex flex-col gap-8 transition-opacity duration-300">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-800 text-lg">Historical Peer-to-Peer Trend Tracker</h3>
+                    <p class="text-xs text-slate-500 mt-1">Select two banks from the dropdowns below to analyze and contrast their performance trajectories over all loaded chronological monthly cycles.</p>
+                    
+                    <!-- Peer Trajectory Selectors -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <!-- Bank A -->
+                        <div class="flex flex-col gap-1.5 p-4 bg-indigo-50/20 rounded-xl border border-indigo-100">
+                            <label class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></span> Bank A (Baseline Peer)
+                            </label>
+                            <select id="hist-select-0" onchange="runHistoricalComparison()" class="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500 transition-all">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Bank B -->
+                        <div class="flex flex-col gap-1.5 p-4 bg-rose-50/20 rounded-xl border border-rose-100">
+                            <label class="text-[10px] font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="h-2 w-2 rounded-full bg-rose-600 animate-pulse"></span> Bank B (Challenger Peer)
+                            </label>
+                            <select id="hist-select-1" onchange="runHistoricalComparison()" class="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg p-2.5 outline-none focus:border-rose-500 transition-all">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Snapshot Metric Blocks (Latest Period) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Metric Card 1 -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Portfolio Size (Latest Month)</h5>
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+                            <span id="hist-stat-name-a1" class="text-xs font-semibold text-slate-700 truncate max-w-[140px]">Bank A</span>
+                            <span id="hist-stat-val-a1" class="text-sm font-bold text-indigo-600 font-mono">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span id="hist-stat-name-b1" class="text-xs font-semibold text-slate-700 truncate max-w-[140px]">Bank B</span>
+                            <span id="hist-stat-val-b1" class="text-sm font-bold text-rose-600 font-mono">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Metric Card 2 -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Monthly Card Spend (Latest Month)</h5>
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+                            <span id="hist-stat-name-a2" class="text-xs font-semibold text-slate-700 truncate max-w-[140px]">Bank A</span>
+                            <span id="hist-stat-val-a2" class="text-sm font-bold text-indigo-600 font-mono">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span id="hist-stat-name-b2" class="text-xs font-semibold text-slate-700 truncate max-w-[140px]">Bank B</span>
+                            <span id="hist-stat-val-b2" class="text-sm font-bold text-rose-600 font-mono">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Metric Card 3 -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Avg Monthly Spend / Card (Latest)</h5>
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+                            <span id="hist-stat-name-a3" class="text-xs font-semibold text-slate-700 truncate max-w-[140px]">Bank A</span>
+                            <span id="hist-stat-val-a3" class="text-sm font-bold text-indigo-600 font-mono">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span id="hist-stat-name-b3" class="text-xs font-semibold text-slate-700 truncate max-w-[140px]">Bank B</span>
+                            <span id="hist-stat-val-b3" class="text-sm font-bold text-rose-600 font-mono">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historical Comparison Line Graphs Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Graph 1: Circulation Growth -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-credit-card text-indigo-500"></i> Outstanding Cards Growth Trajectory
+                        </h4>
+                        <div class="relative h-72">
+                            <canvas id="histCompareCardsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Graph 2: Spends Value -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-indian-rupee-sign text-emerald-500"></i> Monthly Spends Trajectory (₹ Crores)
+                        </h4>
+                        <div class="relative h-72">
+                            <canvas id="histCompareSpendsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Graph 3: Average Spend -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-blue-500"></i> Average Monthly Spend per Card Growth (₹)
+                        </h4>
+                        <div class="relative h-72">
+                            <canvas id="histCompareAvgSpendChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Graph 4: Online Preference Share -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-shuffle text-amber-500"></i> E-Commerce / Online Share Trend (%)
+                        </h4>
+                        <div class="relative h-72">
+                            <canvas id="histCompareOnlineShareChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 border-t border-slate-800 py-6 mt-12 text-center text-xs">
+        <div class="max-w-7xl mx-auto px-4">
+            <p>© 2026 CardPulse Financial Systems. All dashboard metrics calibrated relative to actual Reserve Bank of India reports.</p>
+            <p class="text-[10px] text-slate-500 mt-1">Engineered utilizing responsive fluid layouts, Canvas 2D render loops, and local browser XLSX extraction algorithms.</p>
+        </div>
+    </footer>
+
+    <!-- Core JavaScript Logic & Script Handlers -->
+    <script>
+        // High fidelity mock database for local preview matching scraper defaults
+        const localPreloadData = [
+            { "category": "Public Sector Banks", "sr_no": 1, "bank_name": "BANK OF BARODA", "cards_outstanding": 3172809, "pos_volume": 11069554, "pos_value": 19144376.47, "online_volume": 4447718, "online_value": 17487987.38, "others_volume": 0, "others_value": 0, "atm_volume": 11245, "atm_value": 62144.9 },
+            { "category": "Public Sector Banks", "sr_no": 2, "bank_name": "BANK OF INDIA", "cards_outstanding": 122696, "pos_volume": 120314, "pos_value": 593529.24, "online_volume": 552727, "online_value": 1006086.77, "others_volume": 0, "others_value": 0, "atm_volume": 8468, "atm_value": 50667.8 },
+            { "category": "Public Sector Banks", "sr_no": 4, "bank_name": "CANARA BANK", "cards_outstanding": 1137987, "pos_volume": 1130652, "pos_value": 4719448.60, "online_volume": 551159, "online_value": 3120158.14, "others_volume": 0, "others_value": 0, "atm_volume": 82223, "atm_value": 486270.2 },
+            { "category": "Public Sector Banks", "sr_no": 10, "bank_name": "STATE BANK OF INDIA", "cards_outstanding": 22418883, "pos_volume": 42150361, "pos_value": 185123950.00, "online_volume": 28410294, "online_value": 198234500.00, "others_volume": 12000, "others_value": 24000.00, "atm_volume": 154030, "atm_value": 2690320.00 },
+            { "category": "Private Sector Banks", "sr_no": 13, "bank_name": "AXIS BANK LTD", "cards_outstanding": 16142307, "pos_volume": 31245100, "pos_value": 112103950.00, "online_volume": 28451200, "online_value": 121103950.00, "others_volume": 12410, "others_value": 174800.00, "atm_volume": 62145, "atm_value": 412450.00 },
+            { "category": "Private Sector Banks", "sr_no": 19, "bank_name": "HDFC BANK LTD", "cards_outstanding": 26583337, "pos_volume": 56120390, "pos_value": 298145600.00, "online_volume": 48102931, "online_value": 291245600.00, "others_volume": 524000, "others_value": 3050000.00, "atm_volume": 124500, "atm_value": 1854500.00 },
+            { "category": "Private Sector Banks", "sr_no": 20, "bank_name": "ICICI BANK LTD", "cards_outstanding": 19371259, "pos_volume": 41250391, "pos_value": 158210390.00, "online_volume": 35140291, "online_value": 167210390.00, "others_volume": 312000, "others_value": 2100390.00, "atm_volume": 98410, "atm_value": 899120.00 },
+            { "category": "Private Sector Banks", "sr_no": 22, "bank_name": "IDFC FIRST BANK LTD", "cards_outstanding": 4718127, "pos_volume": 9124500, "pos_value": 24124500.00, "online_volume": 10412390, "online_value": 25145600.00, "others_volume": 12400, "others_value": 41200.00, "atm_volume": 18450, "atm_value": 141200.00 },
+            { "category": "Private Sector Banks", "sr_no": 23, "bank_name": "INDUSIND BANK LTD", "cards_outstanding": 2992845, "pos_volume": 6124500, "pos_value": 22412450.00, "online_volume": 7214560, "online_value": 24890120.00, "others_volume": 8412, "others_value": 31240.00, "atm_volume": 9124, "atm_value": 62140.00 },
+            { "category": "Private Sector Banks", "sr_no": 27, "bank_name": "KOTAK MAHINDRA BANK LTD", "cards_outstanding": 4751679, "pos_volume": 11024500, "pos_value": 31451200.00, "online_volume": 12145000, "online_value": 32145100.00, "others_volume": 21450, "others_value": 112450.00, "atm_volume": 15410, "atm_value": 112450.00 },
+            { "category": "Private Sector Banks", "sr_no": 29, "bank_name": "RBL BANK LTD", "cards_outstanding": 4619198, "pos_volume": 10124500, "pos_value": 35124000.00, "online_volume": 11245000, "online_value": 37145000.00, "others_volume": 14120, "others_value": 91200.00, "atm_volume": 12140, "atm_value": 81240.00 },
+            { "category": "Private Sector Banks", "sr_no": 32, "bank_name": "YES BANK LTD", "cards_outstanding": 2943179, "pos_volume": 7124500, "pos_value": 20145600.00, "online_volume": 8124500, "online_value": 21145100.00, "others_volume": 8450, "others_value": 24500.00, "atm_volume": 7210, "atm_value": 41250.00 }
+        ];
+
+        // Central Timeline State Database
+        let database = {
+            months: ["May 2026"],
+            history: {
+                "May 2026": [...localPreloadData]
+            }
+        };
+
+        let activeMonth = "May 2026";
+        let activeData = [];
+        let currentTab = "home";
+        let activePage = 1;
+        const rowsPerPage = 10;
+        let sortedField = "cards_outstanding";
+        let sortedDirection = "desc";
+        
+        // References to Charts
+        let marketShareChartObj = null;
+        let channelChartObj = null;
+        let sectorChartObj = null;
+        let topSpendsChartObj = null;
+        let compareCardsChartObj = null;
+        let compareSpendsChartObj = null;
+        let trendCardsChartObj = null;
+        let trendSpendsChartObj = null;
+
+        // Core App Lifecycle Bootstrap Hook
+        window.onload = function() {
+            fetch('data.json')
+                .then(res => {
+                    if (!res.ok) throw new Error("Baseline JSON is initializing...");
+                    return res.json();
+                })
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        // Legacy single-month structure parsing
+                        database.months = ["May 2026"];
+                        database.history["May 2026"] = data;
+                        activeMonth = "May 2026";
+                    } else if (data.history && data.months) {
+                        // Automated pipeline multi-month structured parsing
+                        database = data;
+                        activeMonth = database.months[0]; // Set to the newest reporting month
+                    }
+                    bootstrapDashboardApp();
+                })
+                .catch(err => {
+                    console.warn("Using fallback local dataset structures:", err);
+                    bootstrapDashboardApp();
+                });
+        }
+
+        function bootstrapDashboardApp() {
+            setupMonthSelectorDropdown();
+            setupFileUploadListener();
+            handleMonthSelection(activeMonth);
+            initializeHistoricalDropdowns();
+        }
+
+        // Dropdown Generation Engine
+        function setupMonthSelectorDropdown() {
+            const selector = document.getElementById("month-selector");
+            selector.innerHTML = "";
+            database.months.forEach(m => {
+                selector.innerHTML += `<option value="${m}">${m}</option>`;
+            });
+            selector.value = activeMonth;
+        }
+
+        // Active selection modifier
+        function handleMonthSelection(month) {
+            activeMonth = month;
+            activeData = JSON.parse(JSON.stringify(database.history[month] || []));
+            activePage = 1;
+
+            processActiveDataCalculations();
+            renderDashboard();
+            initializeCompareSelectors();
+            runCompareBenchmark();
+            renderTrendCharts();
+        }
+
+        // Switch Navigation Tabs
+        function switchTab(tabId) {
+            currentTab = tabId;
+            const homeView = document.getElementById("home-view");
+            const compareView = document.getElementById("compare-view");
+            const histCompareView = document.getElementById("history-compare-view");
+            
+            const homeBtn = document.getElementById("tab-home-btn");
+            const compareBtn = document.getElementById("tab-compare-btn");
+            const histCompareBtn = document.getElementById("tab-history-compare-btn");
+            const periodCard = document.getElementById("reporting-period-card");
+
+            // Hide all views first
+            homeView.classList.add("hidden");
+            compareView.classList.add("hidden");
+            histCompareView.classList.add("hidden");
+
+            // Reset button styles
+            homeBtn.className = "flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-700/50";
+            compareBtn.className = "flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-700/50";
+            histCompareBtn.className = "flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-700/50";
+            
+            // Show single month selector only where it is relevant
+            periodCard.classList.remove("hidden");
+
+            if (tabId === "home") {
+                homeView.classList.remove("hidden");
+                homeBtn.className = "flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm";
+                setTimeout(() => {
+                    renderDashboard();
+                    renderTrendCharts();
+                }, 50);
+            } else if (tabId === "compare") {
+                compareView.classList.remove("hidden");
+                compareBtn.className = "flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm";
+                setTimeout(runCompareBenchmark, 50);
+            } else if (tabId === "history-compare") {
+                histCompareView.classList.remove("hidden");
+                periodCard.classList.add("hidden"); // Single month period is irrelevant on multi-month page
+                histCompareBtn.className = "flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm";
+                setTimeout(() => {
+                    initializeHistoricalDropdowns();
+                    runHistoricalComparison();
+                }, 50);
+            }
+        }
+
+        // Core Mathematical Processing Normalizer
+        function processActiveDataCalculations() {
+            activeData.forEach(bank => {
+                bank.pos_value_cr = (bank.pos_value || 0) / 10000;
+                bank.online_value_cr = (bank.online_value || 0) / 10000;
+                bank.others_value_cr = (bank.others_value || 0) / 10000;
+                bank.atm_value_cr = (bank.atm_value || 0) / 10000;
+
+                bank.total_spend = bank.pos_value_cr + bank.online_value_cr + bank.others_value_cr;
+                bank.total_volume = (bank.pos_volume || 0) + (bank.online_volume || 0) + (bank.others_volume || 0);
+                bank.total_business = bank.total_spend + bank.atm_value_cr;
+
+                bank.avg_spend_per_card = bank.cards_outstanding > 0 
+                    ? (bank.total_spend * 10000000) / bank.cards_outstanding 
+                    : 0;
+
+                bank.cash_ratio = bank.total_business > 0 
+                    ? (bank.atm_value_cr / bank.total_business) * 100 
+                    : 0;
+
+                bank.ticket_size = bank.total_volume > 0 
+                    ? (bank.total_spend * 10000000) / bank.total_volume 
+                    : 0;
+            });
+
+            document.getElementById("rows-count-badge").innerText = `${activeData.length} Banks Mapped`;
+        }
+
+        // Render Dashboard tab components
+        function renderDashboard() {
+            renderKPIs();
+            renderCharts();
+            renderLedgerTable();
+        }
+
+        // Render high-level KPI cards
+        function renderKPIs() {
+            const totalCards = activeData.reduce((acc, obj) => acc + (obj.cards_outstanding || 0), 0);
+            const totalSpend = activeData.reduce((acc, obj) => acc + (obj.total_spend || 0), 0);
+            const totalVol = activeData.reduce((acc, obj) => acc + (obj.total_volume || 0), 0);
+
+            const avgTicket = totalVol > 0 ? (totalSpend * 10000000) / totalVol : 0;
+
+            let maxBank = { bank_name: "N/A", cards_outstanding: 0 };
+            activeData.forEach(b => {
+                if(b.cards_outstanding > maxBank.cards_outstanding) {
+                    maxBank = b;
+                }
+            });
+
+            document.getElementById("kpi-total-cards").innerText = totalCards.toLocaleString('en-IN');
+            document.getElementById("kpi-total-spend").innerText = "₹ " + totalSpend.toLocaleString('en-IN', { maximumFractionDigits: 1 }) + " Cr";
+            document.getElementById("kpi-avg-ticket").innerText = "₹ " + Math.round(avgTicket).toLocaleString('en-IN');
+            document.getElementById("kpi-market-leader").innerText = maxBank.bank_name;
+        }
+
+        // Render primary dashboard figures
+        function renderCharts() {
+            const validBanks = activeData.filter(b => b.cards_outstanding > 10000);
+            
+            // 1. Market Share (Top 10 Banks)
+            const sortedMarketShare = [...validBanks].sort((a, b) => b.cards_outstanding - a.cards_outstanding).slice(0, 10);
+            const marketShareLabels = sortedMarketShare.map(b => b.bank_name);
+            const marketShareValues = sortedMarketShare.map(b => b.cards_outstanding);
+
+            if (marketShareChartObj) marketShareChartObj.destroy();
+            const ctxMarket = document.getElementById('marketShareChart').getContext('2d');
+            marketShareChartObj = new Chart(ctxMarket, {
+                type: 'pie',
+                data: {
+                    labels: marketShareLabels,
+                    datasets: [{
+                        label: 'Cards Outstanding',
+                        data: marketShareValues,
+                        backgroundColor: [
+                            '#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', 
+                            '#0f172a', '#334155', '#475569', '#64748b', '#94a3b8'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // 2. Channel Allocation Breakdown (Aggregated)
+            const totalPoSValue = activeData.reduce((acc, o) => acc + o.pos_value_cr, 0);
+            const totalOnlineValue = activeData.reduce((acc, o) => acc + o.online_value_cr, 0);
+            const totalOthersValue = activeData.reduce((acc, o) => acc + o.others_value_cr, 0);
+
+            if (channelChartObj) channelChartObj.destroy();
+            const ctxChannel = document.getElementById('channelBreakdownChart').getContext('2d');
+            channelChartObj = new Chart(ctxChannel, {
+                type: 'doughnut',
+                data: {
+                    labels: ['PoS Terminals', 'Online/E-Commerce', 'Others'],
+                    datasets: [{
+                        data: [totalPoSValue, totalOnlineValue, totalOthersValue],
+                        backgroundColor: ['#4f46e5', '#10b981', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    cutout: '60%'
+                }
+            });
+
+            // 3. Sector Wise Issuance Breakdown
+            const sectors = ["Public Sector Banks", "Private Sector Banks", "Foreign Banks", "Small Finance Banks", "Payment Banks"];
+            const sectorValues = sectors.map(sec => {
+                return activeData.filter(b => b.category === sec).reduce((acc, o) => acc + o.cards_outstanding, 0);
+            });
+
+            if (sectorChartObj) sectorChartObj.destroy();
+            const ctxSector = document.getElementById('sectorWiseChart').getContext('2d');
+            sectorChartObj = new Chart(ctxSector, {
+                type: 'polarArea',
+                data: {
+                    labels: sectors,
+                    datasets: [{
+                        data: sectorValues,
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'],
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                    },
+                    scales: { r: { ticks: { display: false } } }
+                }
+            });
+
+            // 4. Top Spends Comparative Bar Chart
+            const sortedSpends = [...validBanks].sort((a, b) => b.total_spend - a.total_spend).slice(0, 10);
+            const spendsLabels = sortedSpends.map(b => b.bank_name);
+            const spendsValues = sortedSpends.map(b => b.total_spend);
+
+            if (topSpendsChartObj) topSpendsChartObj.destroy();
+            const ctxSpends = document.getElementById('topSpendsChart').getContext('2d');
+            topSpendsChartObj = new Chart(ctxSpends, {
+                type: 'bar',
+                data: {
+                    labels: spendsLabels,
+                    datasets: [{
+                        label: 'Total Spends (₹ Cr)',
+                        data: spendsValues,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+                        y: { border: { dash: [4, 4] } }
+                    }
+                }
+            });
+        }
+
+        // Render dynamic monthly timeline trends
+        function renderTrendCharts() {
+            const container = document.getElementById("trends-container");
+            if (database.months.length <= 1) {
+                container.classList.add("hidden");
+                return;
+            }
+            container.classList.remove("hidden");
+
+            // Format array oldest-to-newest for chart display
+            const chronMonths = [...database.months].reverse();
+            const aggregateCards = [];
+            const aggregateSpends = [];
+
+            chronMonths.forEach(m => {
+                const monthArray = database.history[m] || [];
+                let c_sum = 0, s_sum = 0;
+                monthArray.forEach(b => {
+                    c_sum += (b.cards_outstanding || 0);
+                    const p_cr = (b.pos_value || 0) / 10000;
+                    const o_cr = (b.online_value || 0) / 10000;
+                    const t_cr = (b.others_value || 0) / 10000;
+                    s_sum += (p_cr + o_cr + t_cr);
+                });
+                aggregateCards.push(c_sum);
+                aggregateSpends.push(s_sum);
+            });
+
+            // Render Circulation Growth Chart
+            if (trendCardsChartObj) trendCardsChartObj.destroy();
+            const ctxTCards = document.getElementById("trendCardsChart").getContext("2d");
+            trendCardsChartObj = new Chart(ctxTCards, {
+                type: 'line',
+                data: {
+                    labels: chronMonths,
+                    datasets: [{
+                        label: 'Total Active Cards',
+                        data: aggregateCards,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { ticks: { font: { size: 9 } } },
+                        x: { ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
+
+            // Render Spends Growth Chart
+            if (trendSpendsChartObj) trendSpendsChartObj.destroy();
+            const ctxTSpends = document.getElementById("trendSpendsChart").getContext("2d");
+            trendSpendsChartObj = new Chart(ctxTSpends, {
+                type: 'line',
+                data: {
+                    labels: chronMonths,
+                    datasets: [{
+                        label: 'Total Spend Value (₹ Cr)',
+                        data: aggregateSpends,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { ticks: { font: { size: 9 } } },
+                        x: { ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
+        }
+
+        // Render detailed data list grids
+        function renderLedgerTable() {
+            const tableBody = document.getElementById("ledger-table-body");
+            const searchVal = document.getElementById("table-search").value.toLowerCase();
+            const sectorVal = document.getElementById("sector-filter").value;
+
+            // Apply Filters
+            let filtered = activeData.filter(b => {
+                const matchesSearch = b.bank_name.toLowerCase().includes(searchVal);
+                const matchesSector = sectorVal === "" || b.category === sectorVal;
+                return matchesSearch && matchesSector;
+            });
+
+            // Apply Sorting
+            filtered.sort((a, b) => {
+                let valA = a[sortedField];
+                let valB = b[sortedField];
+
+                if (sortedField === 'total_spend') {
+                    valA = a.total_spend;
+                    valB = b.total_spend;
+                }
+
+                if (sortedDirection === "asc") {
+                    return valA > valB ? 1 : -1;
+                } else {
+                    return valA < valB ? 1 : -1;
+                }
+            });
+
+            // Pagination boundaries
+            const totalEntries = filtered.length;
+            const maxPage = Math.max(1, Math.ceil(totalEntries / rowsPerPage));
+            if (activePage > maxPage) activePage = maxPage;
+
+            const startIndex = (activePage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalEntries);
+            const paginated = filtered.slice(startIndex, endIndex);
+
+            // Update UI element values
+            document.getElementById("page-indicator").innerText = `${activePage} / ${maxPage}`;
+            document.getElementById("table-showing-text").innerText = totalEntries > 0 
+                ? `Showing ${startIndex + 1} to ${endIndex} of ${totalEntries} entries`
+                : "No matching records found";
+            
+            document.getElementById("prev-page-btn").disabled = activePage === 1;
+            document.getElementById("next-page-btn").disabled = activePage === maxPage;
+
+            // Render Dynamic Rows
+            tableBody.innerHTML = "";
+            if (paginated.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">No matching banking entities mapped in current filter parameters.</td></tr>`;
+                return;
+            }
+
+            paginated.forEach(row => {
+                const formattedCards = row.cards_outstanding.toLocaleString('en-IN');
+                const formattedTotalSpend = "₹ " + row.total_spend.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " Cr";
+                const formattedPoS = "₹ " + row.pos_value_cr.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " Cr";
+                const formattedOnline = "₹ " + row.online_value_cr.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " Cr";
+                const formattedAvgSpend = "₹ " + Math.round(row.avg_spend_per_card).toLocaleString('en-IN');
+
+                tableBody.innerHTML += `
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-3 px-6 font-semibold text-slate-800">${row.bank_name}</td>
+                        <td class="py-3 px-6">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${getSectorBadgeClasses(row.category)}">
+                                ${row.category}
+                            </span>
+                        </td>
+                        <td class="py-3 px-6 text-right font-medium">${formattedCards}</td>
+                        <td class="py-3 px-6 text-right font-bold text-slate-900">${formattedTotalSpend}</td>
+                        <td class="py-3 px-6 text-right text-slate-600">${formattedPoS}</td>
+                        <td class="py-3 px-6 text-right text-slate-600">${formattedOnline}</td>
+                        <td class="py-3 px-6 text-right text-indigo-600 font-semibold">${formattedAvgSpend}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function getSectorBadgeClasses(cat) {
+            switch(cat) {
+                case "Public Sector Banks": return "bg-blue-50 text-blue-700 border border-blue-200";
+                case "Private Sector Banks": return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+                case "Foreign Banks": return "bg-amber-50 text-amber-700 border border-amber-200";
+                case "Small Finance Banks": return "bg-pink-50 text-pink-700 border border-pink-200";
+                default: return "bg-slate-50 text-slate-700 border border-slate-200";
+            }
+        }
+
+        function sortTableByField(field) {
+            if (sortedField === field) {
+                sortedDirection = sortedDirection === "asc" ? "desc" : "asc";
+            } else {
+                sortedField = field;
+                sortedDirection = "desc";
+            }
+            renderLedgerTable();
+        }
+
+        function filterLedgerTable() {
+            activePage = 1;
+            renderLedgerTable();
+        }
+
+        function changePage(dir) {
+            activePage += dir;
+            renderLedgerTable();
+        }
+
+        // Dropdown menu comparative selectors initial builder
+        function initializeCompareSelectors() {
+            const dropdowns = [
+                document.getElementById("compare-select-0"),
+                document.getElementById("compare-select-1"),
+                document.getElementById("compare-select-2"),
+                document.getElementById("compare-select-3")
+            ];
+
+            const viableBanks = activeData.filter(b => b.cards_outstanding > 0);
+            const sortedBanks = [...viableBanks].sort((a,b) => b.cards_outstanding - a.cards_outstanding);
+            const defaultIndices = [0, 1, 2, 3];
+
+            dropdowns.forEach((dropdown, idx) => {
+                dropdown.innerHTML = "";
+                sortedBanks.forEach((b, bankIdx) => {
+                    const isSelected = bankIdx === defaultIndices[idx] ? "selected" : "";
+                    dropdown.innerHTML += `<option value="${b.bank_name}" ${isSelected}>${b.bank_name}</option>`;
+                });
+            });
+        }
+
+        // Run multi-variable head-to-head comparison (Monthly View)
+        function runCompareBenchmark() {
+            const selectedNames = [
+                document.getElementById("compare-select-0").value,
+                document.getElementById("compare-select-1").value,
+                document.getElementById("compare-select-2").value,
+                document.getElementById("compare-select-3").value
+            ];
+
+            const compareBanks = selectedNames.map(name => {
+                return activeData.find(b => b.bank_name === name);
+            });
+
+            compareBanks.forEach((b, idx) => {
+                document.getElementById(`comp-tbl-header-${idx}`).innerText = b ? b.bank_name : "Not Selected";
+            });
+
+            const cardsRow = document.getElementById("comparison-cards-row");
+            cardsRow.innerHTML = "";
+
+            const accentColors = ['indigo', 'emerald', 'amber', 'fuchsia'];
+            const accentHex = ['#6366f1', '#10b981', '#f59e0b', '#d946ef'];
+
+            compareBanks.forEach((b, idx) => {
+                if(!b) return;
+
+                const cardCirculation = b.cards_outstanding.toLocaleString('en-IN');
+                const spendsVal = "₹ " + b.total_spend.toLocaleString('en-IN', { maximumFractionDigits: 1 }) + " Cr";
+                const avgSpendVal = "₹ " + Math.round(b.avg_spend_per_card).toLocaleString('en-IN');
+                const cashRatioVal = b.cash_ratio.toFixed(2) + "%";
+
+                cardsRow.innerHTML += `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 relative overflow-hidden">
+                        <div class="absolute top-0 inset-x-0 h-1.5 bg-${accentColors[idx]}-500"></div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">PORTFOLIO ${idx + 1}</span>
+                            <span class="inline-flex px-2 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase bg-${accentColors[idx]}-50 text-${accentColors[idx]}-700 border border-${accentColors[idx]}-200">
+                                ${b.category.split(' ')[0]}
+                            </span>
+                        </div>
+                        
+                        <div>
+                            <h4 class="text-base font-bold text-slate-800 truncate">${b.bank_name}</h4>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Rank: #${b.sr_no}</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 border-t border-b border-slate-100 py-3.5 my-1">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-slate-400">Circulation</span>
+                                <span class="text-sm font-bold text-slate-800">${cardCirculation}</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-slate-400">Monthly Spend</span>
+                                <span class="text-sm font-bold text-${accentColors[idx]}-600">${spendsVal}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-1.5 text-[11px] text-slate-600">
+                            <div class="flex justify-between">
+                                <span>Avg Spend / Card:</span>
+                                <span class="font-semibold text-slate-800">${avgSpendVal}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Cash Pull Ratio:</span>
+                                <span class="font-semibold text-slate-800">${cashRatioVal}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const scorecardBody = document.getElementById("comparison-table-body");
+            scorecardBody.innerHTML = "";
+
+            const paramsToCompare = [
+                { label: "Active Cards Outstanding", field: "cards_outstanding", suffix: "", formatter: val => val.toLocaleString('en-IN') },
+                { label: "Monthly POS Volume (Terminals)", field: "pos_volume", suffix: "", formatter: val => val.toLocaleString('en-IN') },
+                { label: "Monthly POS Spends (Value)", field: "pos_value_cr", suffix: " Cr", formatter: val => "₹ " + val.toLocaleString('en-IN', { maximumFractionDigits: 1 }) },
+                { label: "Monthly Online Volume (E-com)", field: "online_volume", suffix: "", formatter: val => val.toLocaleString('en-IN') },
+                { label: "Monthly Online Spends (Value)", field: "online_value_cr", suffix: " Cr", formatter: val => "₹ " + val.toLocaleString('en-IN', { maximumFractionDigits: 1 }) },
+                { label: "Monthly ATM cash withdrawals", field: "atm_value_cr", suffix: " Cr", formatter: val => "₹ " + val.toLocaleString('en-IN', { maximumFractionDigits: 1 }) },
+                { label: "Average Monthly Card Spend", field: "avg_spend_per_card", suffix: "", formatter: val => "₹ " + Math.round(val).toLocaleString('en-IN') },
+                { label: "Calculated Ticket Value", field: "ticket_size", suffix: "", formatter: val => "₹ " + Math.round(val).toLocaleString('en-IN') }
+            ];
+
+            paramsToCompare.forEach(p => {
+                let rowHTML = `
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="py-3 px-6 font-semibold text-slate-600">${p.label}</td>
+                `;
+
+                compareBanks.forEach(b => {
+                    const value = b ? b[p.field] : 0;
+                    rowHTML += `
+                        <td class="py-3 px-6 text-center font-bold text-slate-800">
+                            ${b ? p.formatter(value) + p.suffix : '--'}
+                        </td>
+                    `;
+                });
+
+                rowHTML += `</tr>`;
+                scorecardBody.innerHTML += rowHTML;
+            });
+
+            const labels = compareBanks.map(b => b ? b.bank_name : "Empty");
+            const cardsData = compareBanks.map(b => b ? b.cards_outstanding : 0);
+            const spendsData = compareBanks.map(b => b ? b.total_spend : 0);
+
+            if (compareCardsChartObj) compareCardsChartObj.destroy();
+            const ctxCompCards = document.getElementById('compareCardsChart').getContext('2d');
+            compareCardsChartObj = new Chart(ctxCompCards, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: cardsData,
+                        backgroundColor: accentHex,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { border: { dash: [4, 4] } } }
+                }
+            });
+
+            if (compareSpendsChartObj) compareSpendsChartObj.destroy();
+            const ctxCompSpends = document.getElementById('compareSpendsChart').getContext('2d');
+            compareSpendsChartObj = new Chart(ctxCompSpends, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: spendsData,
+                        backgroundColor: accentHex,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { border: { dash: [4, 4] } } }
+                }
+            });
+        }
+
+        // =================================================================
+        // NEW: HISTORICAL COMPARISON SYSTEM ENGINE (TIME-SERIES)
+        // =================================================================
+        
+        // Find every unique bank name inside any of the loaded monthly history blocks
+        function getMasterUniqueBanks() {
+            let uniqueList = new Set();
+            database.months.forEach(m => {
+                const arr = database.history[m] || [];
+                arr.forEach(b => {
+                    if (b.bank_name) uniqueList.add(b.bank_name);
+                });
+            });
+            return Array.from(uniqueList).sort();
+        }
+
+        // Populates historical dropdown list elements
+        function initializeHistoricalDropdowns() {
+            const list = getMasterUniqueBanks();
+            const dropdowns = [
+                document.getElementById("hist-select-0"),
+                document.getElementById("hist-select-1")
+            ];
+
+            // Sensible out-of-the-box comparative defaults
+            let defaults = ["HDFC BANK LTD", "ICICI BANK LTD"];
+            if (!list.includes(defaults[0])) defaults[0] = list[0] || "";
+            if (!list.includes(defaults[1])) defaults[1] = list[1] || "";
+
+            dropdowns.forEach((dropdown, idx) => {
+                dropdown.innerHTML = "";
+                list.forEach(bank => {
+                    const isSelected = bank === defaults[idx] ? "selected" : "";
+                    dropdown.innerHTML += `<option value="${bank}" ${isSelected}>${bank}</option>`;
+                });
+            });
+        }
+
+        // Computes and plots historical metrics (Time Series Engine)
+        function runHistoricalComparison() {
+            const bankA = document.getElementById("hist-select-0").value;
+            const bankB = document.getElementById("hist-select-1").value;
+
+            // X-Axis Months needs chronological sorting (Oldest to Newest)
+            const chronologicalMonths = [...database.months].reverse();
+
+            const dataA = { cards: [], spends: [], avgSpend: [], onlineShare: [] };
+            const dataB = { cards: [], spends: [], avgSpend: [], onlineShare: [] };
+
+            chronologicalMonths.forEach(m => {
+                const monthArray = database.history[m] || [];
+                const profileA = monthArray.find(b => b.bank_name === bankA);
+                const profileB = monthArray.find(b => b.bank_name === bankB);
+
+                const getMetrics = (profile) => {
+                    if (!profile) return { cards: 0, spends: 0, avgSpend: 0, onlineShare: 0 };
+                    
+                    const cards = profile.cards_outstanding || profile.cards_outstanding === 0 ? profile.cards_outstanding : (profile.cards_outstanding || 0);
+                    const pos_cr = (profile.pos_value || 0) / 10000;
+                    const online_cr = (profile.online_value || 0) / 10000;
+                    const others_cr = (profile.others_value || 0) / 10000;
+                    const totalSpend = pos_cr + online_cr + others_cr;
+
+                    const avgSpend = cards > 0 ? (totalSpend * 10000000) / cards : 0;
+                    const onlineShare = totalSpend > 0 ? (online_cr / totalSpend) * 100 : 0;
+
+                    return { cards, spends: totalSpend, avgSpend, onlineShare };
+                };
+
+                const metricsA = getMetrics(profileA);
+                const metricsB = getMetrics(profileB);
+
+                dataA.cards.push(metricsA.cards);
+                dataA.spends.push(metricsA.spends);
+                dataA.avgSpend.push(metricsA.avgSpend);
+                dataA.onlineShare.push(metricsA.onlineShare);
+
+                dataB.cards.push(metricsB.cards);
+                dataB.spends.push(metricsB.spends);
+                dataB.avgSpend.push(metricsB.avgSpend);
+                dataB.onlineShare.push(metricsB.onlineShare);
+            });
+
+            // Update Quick Snapshot Info Headers
+            document.getElementById("hist-stat-name-a1").innerText = bankA;
+            document.getElementById("hist-stat-name-b1").innerText = bankB;
+            document.getElementById("hist-stat-name-a2").innerText = bankA;
+            document.getElementById("hist-stat-name-b2").innerText = bankB;
+            document.getElementById("hist-stat-name-a3").innerText = bankA;
+            document.getElementById("hist-stat-name-b3").innerText = bankB;
+
+            const lastIndex = chronologicalMonths.length - 1;
+            if (lastIndex >= 0) {
+                document.getElementById("hist-stat-val-a1").innerText = dataA.cards[lastIndex].toLocaleString('en-IN');
+                document.getElementById("hist-stat-val-b1").innerText = dataB.cards[lastIndex].toLocaleString('en-IN');
+                document.getElementById("hist-stat-val-a2").innerText = "₹ " + dataA.spends[lastIndex].toLocaleString('en-IN', { maximumFractionDigits: 1 }) + " Cr";
+                document.getElementById("hist-stat-val-b2").innerText = "₹ " + dataB.spends[lastIndex].toLocaleString('en-IN', { maximumFractionDigits: 1 }) + " Cr";
+                document.getElementById("hist-stat-val-a3").innerText = "₹ " + Math.round(dataA.avgSpend[lastIndex]).toLocaleString('en-IN');
+                document.getElementById("hist-stat-val-b3").innerText = "₹ " + Math.round(dataB.avgSpend[lastIndex]).toLocaleString('en-IN');
+            }
+
+            // Universal Trendline Plotter Helper
+            const plotTrend = (canvasId, chartKey, valA, valB, colA, colB, formatter) => {
+                if (chartInstances[chartKey]) chartInstances[chartKey].destroy();
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                chartInstances[chartKey] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chronologicalMonths,
+                        datasets: [
+                            {
+                                label: bankA,
+                                data: valA,
+                                borderColor: colA,
+                                backgroundColor: colA + '0A',
+                                fill: true,
+                                tension: 0.3,
+                                borderWidth: 3,
+                                pointRadius: 4
+                            },
+                            {
+                                label: bankB,
+                                data: valB,
+                                borderColor: colB,
+                                backgroundColor: colB + '0A',
+                                fill: true,
+                                tension: 0.3,
+                                borderWidth: 3,
+                                pointRadius: 4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) {
+                                        let lbl = ctx.dataset.label || '';
+                                        if (lbl) lbl += ': ';
+                                        if (ctx.parsed.y !== null) {
+                                            lbl += formatter(ctx.parsed.y);
+                                        }
+                                        return lbl;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { font: { size: 9 } }, grid: { display: false } },
+                            y: { border: { dash: [4, 4] }, ticks: { font: { size: 9 } } }
+                        }
+                    }
+                });
+            };
+
+            // Chart 1: Outstanding Cards
+            plotTrend('histCompareCardsChart', 'histCards', dataA.cards, dataB.cards, '#6366f1', '#f43f5e', val => val.toLocaleString('en-IN'));
+            
+            // Chart 2: Spends Value
+            plotTrend('histCompareSpendsChart', 'histSpends', dataA.spends, dataB.spends, '#6366f1', '#f43f5e', val => "₹ " + val.toLocaleString('en-IN', { maximumFractionDigits: 1 }) + " Cr");
+            
+            // Chart 3: Average spend per card
+            plotTrend('histCompareAvgSpendChart', 'histAvgSpend', dataA.avgSpend, dataB.avgSpend, '#6366f1', '#f43f5e', val => "₹ " + Math.round(val).toLocaleString('en-IN'));
+            
+            // Chart 4: Online Preference Ratio
+            plotTrend('histCompareOnlineShareChart', 'histOnlineShare', dataA.onlineShare, dataB.onlineShare, '#6366f1', '#f43f5e', val => val.toFixed(1) + "%");
+        }
+
+        // Configure Local File Upload Drag-Drop Ingestion Listeners
+        function setupFileUploadListener() {
+            const uploader = document.getElementById("file-uploader");
+            const dropZone = document.getElementById("drop-zone");
+
+            dropZone.onclick = () => uploader.click();
+
+            dropZone.ondragover = (e) => {
+                e.preventDefault();
+                dropZone.classList.add("border-indigo-500", "bg-indigo-50/20");
+            };
+
+            dropZone.ondragleave = () => {
+                dropZone.classList.remove("border-indigo-500", "bg-indigo-50/20");
+            };
+
+            dropZone.ondrop = (e) => {
+                e.preventDefault();
+                dropZone.classList.remove("border-indigo-500", "bg-indigo-50/20");
+                if (e.dataTransfer.files.length > 0) {
+                    processFile(e.dataTransfer.files[0]);
+                }
+            };
+
+            uploader.onchange = (e) => {
+                if (uploader.files.length > 0) {
+                    processFile(uploader.files[0]);
+                }
+            };
+        }
+
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    if (sheetData.length < 10) {
+                        showUploadError("Unrecognized spreadsheet dimensions. Please upload an authentic RBI payment dataset.");
+                        return;
+                    }
+
+                    const parsedResult = parseRbiSpreadsheetRows(sheetData);
+                    if(parsedResult.length === 0) {
+                        showUploadError("Could not resolve Sr No and Bank structures. Verify formatting.");
+                        return;
+                    }
+
+                    // Format temporary unique month name
+                    const customMonthName = "Uploaded File (" + file.name.substring(0, 12) + "...)";
+                    
+                    // Insert custom data into state variables
+                    if(!database.months.includes(customMonthName)) {
+                        database.months.unshift(customMonthName);
+                    }
+                    database.history[customMonthName] = parsedResult;
+
+                    setupMonthSelectorDropdown();
+                    switchTab('home');
+                    handleMonthSelection(customMonthName);
+                    
+                    // Sync the fresh file with historical selectors
+                    initializeHistoricalDropdowns();
+                    if (currentTab === 'history-compare') {
+                        runHistoricalComparison();
+                    }
+
+                    const badge = document.getElementById("data-status-badge");
+                    badge.innerHTML = `<span class="h-1.5 w-1.5 bg-emerald-500 rounded-full"></span> Dynamic Sheet Active`;
+                    badge.className = "bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5";
+                    hideUploadError();
+
+                } catch (error) {
+                    console.error(error);
+                    showUploadError("Conversion failed. Verify input conforms to expected RBI spreadsheets.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parseRbiSpreadsheetRows(rows) {
+            const cleaned = [];
+            let currentCategory = "Unknown Category";
+
+            for(let idx = 0; idx < rows.length; idx++) {
+                const row = rows[idx];
+                if (!row || row.length < 10) continue;
+
+                const cell1 = String(row[1] || "").trim();
+                const cell2 = String(row[2] || "").trim();
+
+                if (cell1 === "" || cell1.toLowerCase() === "nan") continue;
+
+                if (cell2 === "" || cell2.toLowerCase() === "nan") {
+                    if (cell1.toLowerCase().includes("bank") || cell1.toLowerCase().includes("sector") || cell1.toLowerCase().includes("total")) {
+                        currentCategory = cell1;
+                    }
+                    continue;
+                }
+
+                if (/^\d+$/.test(cell1)) {
+                    const srNo = parseInt(cell1);
+                    const bankName = cell2.toUpperCase();
+
+                    const cleanNum = (val) => {
+                        if (val === undefined || val === null || String(val).trim() === "" || String(val).trim().toLowerCase() === "nan") {
+                            return 0;
+                        }
+                        const cleanStr = String(val).replace(/,/g, '').trim();
+                        const parsed = parseFloat(cleanStr);
+                        return isNaN(parsed) ? 0 : parsed;
+                    };
+
+                    cleaned.push({
+                        category: currentCategory,
+                        sr_no: srNo,
+                        bank_name: bankName,
+                        cards_outstanding: cleanNum(row[9]),
+                        pos_volume: cleanNum(row[11]),
+                        pos_value: cleanNum(row[12]),
+                        online_volume: cleanNum(row[13]),
+                        online_value: cleanNum(row[14]),
+                        others_volume: cleanNum(row[15]),
+                        others_value: cleanNum(row[16]),
+                        atm_volume: cleanNum(row[17]),
+                        atm_value: cleanNum(row[18])
+                    });
+                }
+            }
+            return cleaned;
+        }
+
+        function showUploadError(text) {
+            const alertBox = document.getElementById("alert-box");
+            const alertText = document.getElementById("alert-text");
+            alertText.innerText = text;
+            alertBox.classList.remove("hidden");
+        }
+
+        function hideUploadError() {
+            const alertBox = document.getElementById("alert-box");
+            alertBox.classList.add("hidden");
+        }
+    </script>
+</body>
+</html>
